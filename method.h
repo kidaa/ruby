@@ -8,8 +8,8 @@
   Copyright (C) 2009 Koichi Sasada
 
 **********************************************************************/
-#ifndef METHOD_H
-#define METHOD_H
+#ifndef RUBY_METHOD_H
+#define RUBY_METHOD_H 1
 
 #include "internal.h"
 
@@ -118,7 +118,10 @@ typedef enum {
     END_OF_ENUMERATION(VM_METHOD_TYPE)
 } rb_method_type_t;
 
+#ifndef rb_iseq_t
 typedef struct rb_iseq_struct rb_iseq_t;
+#define rb_iseq_t rb_iseq_t
+#endif
 
 typedef struct rb_method_iseq_struct {
     const rb_iseq_t * const iseqptr;              /* should be separated from iseqval */
@@ -210,4 +213,4 @@ void rb_method_entry_copy(rb_method_entry_t *dst, const rb_method_entry_t *src);
 
 void rb_scope_visibility_set(rb_method_visibility_t);
 
-#endif /* METHOD_H */
+#endif /* RUBY_METHOD_H */

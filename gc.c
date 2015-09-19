@@ -184,9 +184,7 @@ static ruby_gc_params_t gc_params = {
     GC_OLDMALLOC_LIMIT_MIN,
     GC_OLDMALLOC_LIMIT_MAX,
     GC_OLDMALLOC_LIMIT_GROWTH_FACTOR,
-#if defined(ENABLE_VM_OBJSPACE) && ENABLE_VM_OBJSPACE
     FALSE,
-#endif
 };
 
 /* GC_DEBUG:
@@ -1258,18 +1256,19 @@ RVALUE_WHITE_P(VALUE obj)
   --------------------------- ObjectSpace -----------------------------
 */
 
-#if defined(ENABLE_VM_OBJSPACE) && ENABLE_VM_OBJSPACE
 rb_objspace_t *
 rb_objspace_alloc(void)
 {
+#if defined(ENABLE_VM_OBJSPACE) && ENABLE_VM_OBJSPACE
     rb_objspace_t *objspace = calloc(1, sizeof(rb_objspace_t));
+#else
+    rb_objspace_t *objspace = &rb_objspace;
+#endif
     malloc_limit = gc_params.malloc_limit_min;
 
     return objspace;
 }
-#endif
 
-#if defined(ENABLE_VM_OBJSPACE) && ENABLE_VM_OBJSPACE
 static void free_stack_chunks(mark_stack_t *);
 static void heap_page_free(rb_objspace_t *objspace, struct heap_page *page);
 
@@ -1307,9 +1306,11 @@ rb_objspace_free(rb_objspace_t *objspace)
 	objspace->eden_heap.pages = NULL;
     }
     free_stack_chunks(&objspace->mark_stack);
+#if !(defined(ENABLE_VM_OBJSPACE) && ENABLE_VM_OBJSPACE)
+    if (objspace == &rb_objspace) return;
+#endif
     free(objspace);
 }
-#endif
 
 static void
 heap_pages_expand_sorted(rb_objspace_t *objspace)
@@ -3666,7 +3667,6 @@ pop_mark_stack_chunk(mark_stack_t *stack)
     stack->index = stack->limit;
 }
 
-#if (defined(ENABLE_VM_OBJSPACE) && ENABLE_VM_OBJSPACE) || (RGENGC_CHECK_MODE >= 4)
 static void
 free_stack_chunks(mark_stack_t *stack)
 {
@@ -3679,7 +3679,6 @@ free_stack_chunks(mark_stack_t *stack)
         chunk = next;
     }
 }
-#endif
 
 static void
 push_mark_stack(mark_stack_t *stack, VALUE data)
@@ -8976,6 +8975,7 @@ rb_raw_obj_info(char *buff, const int buff_size, VALUE obj)
 	      IMEMO_NAME(ifunc);
 	      IMEMO_NAME(memo);
 	      IMEMO_NAME(ment);
+	      IMEMO_NAME(iseq);
 	    default: rb_bug("unknown IMEMO");
 #undef IMEMO_NAME
 	  }
@@ -8993,7 +8993,9 @@ rb_raw_obj_info(char *buff, const int buff_size, VALUE obj)
 
 		if (iseq->body->location.label) {
 		    snprintf(buff, buff_size, "%s %s@%s:%d", buff,
-			     RSTRING_PTR(iseq->body->location.label), RSTRING_PTR(iseq->body->location.path), (int)iseq->body->location.first_lineno);
+			     RSTRING_PTR(iseq->body->location.label),
+			     RSTRING_PTR(iseq->body->location.path),
+			     FIX2INT(iseq->body->location.first_lineno));
 		}
 		break;
 	    }

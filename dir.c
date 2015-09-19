@@ -12,6 +12,7 @@
 **********************************************************************/
 
 #include "internal.h"
+#include "encindex.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -670,6 +671,18 @@ dir_path(VALUE dir)
 }
 
 #if defined _WIN32
+static int
+fundamental_encoding_p(rb_encoding *enc)
+{
+    switch (rb_enc_to_index(enc)) {
+      case ENCINDEX_ASCII:
+      case ENCINDEX_US_ASCII:
+      case ENCINDEX_UTF_8:
+	return TRUE;
+      default:
+	return FALSE;
+    }
+}
 # define READDIR(dir, enc) rb_w32_readdir((dir), (enc))
 #else
 # define READDIR(dir, enc) readdir((dir))
@@ -1212,9 +1225,7 @@ do_opendir(const char *path, int flags, rb_encoding *enc)
     DIR *dirp;
 #ifdef _WIN32
     VALUE tmp = 0;
-    if (enc != rb_usascii_encoding() &&
-	enc != rb_ascii8bit_encoding() &&
-	enc != rb_utf8_encoding()) {
+    if (!fundamental_encoding_p(enc)) {
 	tmp = rb_enc_str_new(path, strlen(path), enc);
 	tmp = rb_str_encode_ospath(tmp);
 	path = RSTRING_PTR(tmp);
@@ -1525,10 +1536,7 @@ replace_real_basename(char *path, long base, rb_encoding *enc, int norm_p, int f
     HANDLE h = INVALID_HANDLE_VALUE;
     long wlen;
     int e = 0;
-    if (enc &&
-	enc != rb_usascii_encoding() &&
-	enc != rb_ascii8bit_encoding() &&
-	enc != rb_utf8_encoding()) {
+    if (!fundamental_encoding_p(enc)) {
 	tmp = rb_enc_str_new_cstr(plainname, enc);
 	tmp = rb_str_encode_ospath(tmp);
 	plainname = RSTRING_PTR(tmp);
@@ -1793,15 +1801,18 @@ glob_helper(
 	    }
 	    name = buf + pathlen + (dirsep != 0);
 	    if (recursive && dotfile < ((flags & FNM_DOTMATCH) ? 2 : 1)) {
+#ifdef DT_UNKNOWN
+		if ((new_pathtype = dp->d_type) != (rb_pathtype_t)DT_UNKNOWN)
+		    /* Got it. We need nothing more. */
+		    ;
+		else
+		    /* fall back to call lstat(2) */
+#endif
 		/* RECURSIVE never match dot files unless FNM_DOTMATCH is set */
-#ifndef DT_DIR
 		if (do_lstat(buf, &st, flags, enc) == 0)
 		    new_pathtype = IFTODT(st.st_mode);
 		else
 		    new_pathtype = path_noent;
-#else
-		new_pathtype = dp->d_type;
-#endif
 	    }
 
 	    new_beg = new_end = GLOB_ALLOC_N(struct glob_pattern *, (end - beg) * 2);
@@ -2119,8 +2130,10 @@ push_glob(VALUE ary, VALUE str, int flags)
 #ifdef __APPLE__
     str = rb_str_encode_ospath(str);
 #endif
-    if (enc == rb_usascii_encoding()) enc = rb_filesystem_encoding();
-    if (enc == rb_usascii_encoding()) enc = rb_ascii8bit_encoding();
+    if (rb_enc_to_index(enc) == ENCINDEX_US_ASCII)
+	enc = rb_filesystem_encoding();
+    if (rb_enc_to_index(enc) == ENCINDEX_US_ASCII)
+	enc = rb_ascii8bit_encoding();
     flags |= GLOB_VERBOSE;
     args.glob.func = push_pattern;
     args.glob.value = ary;

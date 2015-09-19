@@ -143,7 +143,7 @@ PRE_LIBRUBY_UPDATE = $(MINIRUBY) -e 'ARGV[1] or File.unlink(ARGV[0]) rescue nil'
 			$(LIBRUBY_EXTS) $(LIBRUBY_SO_UPDATE)
 
 TESTSDIR      = $(srcdir)/test
-TEST_EXCLUDES = --excludes=$(TESTSDIR)/excludes
+TEST_EXCLUDES = --excludes=$(TESTSDIR)/excludes -x /testunit/ -x /minitest/ -x /memory_leak/
 TESTWORKDIR   = testwork
 TESTOPTS      = $(RUBY_TESTOPTS)
 
@@ -578,9 +578,14 @@ no-test-knownbug: PHONY
 yes-test-knownbug: prog PHONY
 	-$(exec) $(RUNRUBY) "$(srcdir)/bootstraptest/runner.rb" --ruby="$(PROGRAM) $(RUN_OPTS)" $(OPTS) $(TESTOPTS) $(srcdir)/KNOWNBUGS.rb
 
+test-testframework: $(TEST_RUNNABLE)-test-testframework
+no-test-testframework: PHONY
+yes-test-testframework: prog PHONY
+	$(Q)$(exec) $(RUNRUBY) "$(srcdir)/test/runner.rb" --ruby="$(RUNRUBY)" $(TESTOPTS) testunit minitest
+
 test: test-sample btest-ruby test-knownbug
 
-test-all: $(TEST_RUNNABLE)-test-all
+test-all: test-testframework $(TEST_RUNNABLE)-test-all
 yes-test-all: prog PHONY
 	$(Q)$(exec) $(RUNRUBY) "$(srcdir)/test/runner.rb" --ruby="$(RUNRUBY)" $(TEST_EXCLUDES) $(TESTOPTS) $(TESTS)
 TESTS_BUILD = mkmf
@@ -590,7 +595,7 @@ no-test-all: PHONY
 test-ruby: $(TEST_RUNNABLE)-test-ruby
 no-test-ruby: PHONY
 yes-test-ruby: prog encs PHONY
-	$(RUNRUBY) "$(srcdir)/test/runner.rb" -q $(TESTOPTS) -- ruby -ext-
+	$(RUNRUBY) "$(srcdir)/test/runner.rb" $(TEST_EXCLUDES) $(TESTOPTS) -- ruby -ext-
 
 extconf: $(PREP)
 	$(Q) $(MAKEDIRS) "$(EXTCONFDIR)"
@@ -711,7 +716,7 @@ prelude.$(OBJEXT): {$(VPATH)}prelude.c
 compile.$(OBJEXT): {$(VPATH)}opt_sc.inc {$(VPATH)}optunifs.inc
 
 win32/win32.$(OBJEXT): {$(VPATH)}win32/win32.c {$(VPATH)}win32/file.h \
-  {$(VPATH)}dln.h {$(VPATH)}dln_find.c \
+  {$(VPATH)}dln.h {$(VPATH)}dln_find.c {$(VPATH)}encindex.h \
   {$(VPATH)}internal.h {$(VPATH)}util.h $(RUBY_H_INCLUDES) $(PLATFORM_D)
 win32/file.$(OBJEXT): {$(VPATH)}win32/file.c {$(VPATH)}win32/file.h {$(VPATH)}thread.h \
   $(RUBY_H_INCLUDES) $(PLATFORM_D)
@@ -934,7 +939,7 @@ update-config_files: PHONY
 
 update-gems: PHONY
 	$(ECHO) Downloading bundled gem files...
-	$(Q) $(RUNRUBY) -C "$(srcdir)/gems" \
+	$(Q) $(BASERUBY) -C "$(srcdir)/gems" \
 	    -I../tool -rdownloader -answ \
 	    -e 'gem, ver = *$$F' \
 	    -e 'old = Dir.glob("#{gem}-*.gem")' \
@@ -1246,6 +1251,7 @@ dir.$(OBJEXT): $(top_srcdir)/include/ruby.h
 dir.$(OBJEXT): {$(VPATH)}config.h
 dir.$(OBJEXT): {$(VPATH)}defines.h
 dir.$(OBJEXT): {$(VPATH)}dir.c
+dir.$(OBJEXT): {$(VPATH)}encindex.h
 dir.$(OBJEXT): {$(VPATH)}encoding.h
 dir.$(OBJEXT): {$(VPATH)}intern.h
 dir.$(OBJEXT): {$(VPATH)}internal.h
@@ -1286,6 +1292,7 @@ dmyext.$(OBJEXT): {$(VPATH)}dmyext.c
 enc/ascii.$(OBJEXT): {$(VPATH)}config.h
 enc/ascii.$(OBJEXT): {$(VPATH)}defines.h
 enc/ascii.$(OBJEXT): {$(VPATH)}enc/ascii.c
+enc/ascii.$(OBJEXT): {$(VPATH)}encindex.h
 enc/ascii.$(OBJEXT): {$(VPATH)}missing.h
 enc/ascii.$(OBJEXT): {$(VPATH)}oniguruma.h
 enc/ascii.$(OBJEXT): {$(VPATH)}regenc.h
@@ -1314,12 +1321,14 @@ enc/unicode.$(OBJEXT): {$(VPATH)}subst.h
 enc/us_ascii.$(OBJEXT): {$(VPATH)}config.h
 enc/us_ascii.$(OBJEXT): {$(VPATH)}defines.h
 enc/us_ascii.$(OBJEXT): {$(VPATH)}enc/us_ascii.c
+enc/us_ascii.$(OBJEXT): {$(VPATH)}encindex.h
 enc/us_ascii.$(OBJEXT): {$(VPATH)}missing.h
 enc/us_ascii.$(OBJEXT): {$(VPATH)}oniguruma.h
 enc/us_ascii.$(OBJEXT): {$(VPATH)}regenc.h
 enc/utf_8.$(OBJEXT): {$(VPATH)}config.h
 enc/utf_8.$(OBJEXT): {$(VPATH)}defines.h
 enc/utf_8.$(OBJEXT): {$(VPATH)}enc/utf_8.c
+enc/utf_8.$(OBJEXT): {$(VPATH)}encindex.h
 enc/utf_8.$(OBJEXT): {$(VPATH)}missing.h
 enc/utf_8.$(OBJEXT): {$(VPATH)}oniguruma.h
 enc/utf_8.$(OBJEXT): {$(VPATH)}regenc.h
@@ -1327,6 +1336,7 @@ encoding.$(OBJEXT): $(hdrdir)/ruby/ruby.h
 encoding.$(OBJEXT): $(top_srcdir)/include/ruby.h
 encoding.$(OBJEXT): {$(VPATH)}config.h
 encoding.$(OBJEXT): {$(VPATH)}defines.h
+encoding.$(OBJEXT): {$(VPATH)}encindex.h
 encoding.$(OBJEXT): {$(VPATH)}encoding.c
 encoding.$(OBJEXT): {$(VPATH)}encoding.h
 encoding.$(OBJEXT): {$(VPATH)}intern.h
@@ -1432,6 +1442,7 @@ file.$(OBJEXT): $(top_srcdir)/include/ruby.h
 file.$(OBJEXT): {$(VPATH)}config.h
 file.$(OBJEXT): {$(VPATH)}defines.h
 file.$(OBJEXT): {$(VPATH)}dln.h
+file.$(OBJEXT): {$(VPATH)}encindex.h
 file.$(OBJEXT): {$(VPATH)}encoding.h
 file.$(OBJEXT): {$(VPATH)}file.c
 file.$(OBJEXT): {$(VPATH)}intern.h
@@ -1555,6 +1566,7 @@ io.$(OBJEXT): $(top_srcdir)/include/ruby.h
 io.$(OBJEXT): {$(VPATH)}config.h
 io.$(OBJEXT): {$(VPATH)}defines.h
 io.$(OBJEXT): {$(VPATH)}dln.h
+io.$(OBJEXT): {$(VPATH)}encindex.h
 io.$(OBJEXT): {$(VPATH)}encoding.h
 io.$(OBJEXT): {$(VPATH)}id.h
 io.$(OBJEXT): {$(VPATH)}intern.h
@@ -1646,6 +1658,7 @@ localeinit.$(OBJEXT): $(hdrdir)/ruby/ruby.h
 localeinit.$(OBJEXT): $(top_srcdir)/include/ruby.h
 localeinit.$(OBJEXT): {$(VPATH)}config.h
 localeinit.$(OBJEXT): {$(VPATH)}defines.h
+localeinit.$(OBJEXT): {$(VPATH)}encindex.h
 localeinit.$(OBJEXT): {$(VPATH)}encoding.h
 localeinit.$(OBJEXT): {$(VPATH)}intern.h
 localeinit.$(OBJEXT): {$(VPATH)}internal.h
@@ -1670,6 +1683,7 @@ marshal.$(OBJEXT): $(hdrdir)/ruby/ruby.h
 marshal.$(OBJEXT): $(top_srcdir)/include/ruby.h
 marshal.$(OBJEXT): {$(VPATH)}config.h
 marshal.$(OBJEXT): {$(VPATH)}defines.h
+marshal.$(OBJEXT): {$(VPATH)}encindex.h
 marshal.$(OBJEXT): {$(VPATH)}encoding.h
 marshal.$(OBJEXT): {$(VPATH)}id_table.h
 marshal.$(OBJEXT): {$(VPATH)}intern.h
@@ -1933,6 +1947,7 @@ re.$(OBJEXT): $(hdrdir)/ruby/ruby.h
 re.$(OBJEXT): $(top_srcdir)/include/ruby.h
 re.$(OBJEXT): {$(VPATH)}config.h
 re.$(OBJEXT): {$(VPATH)}defines.h
+re.$(OBJEXT): {$(VPATH)}encindex.h
 re.$(OBJEXT): {$(VPATH)}encoding.h
 re.$(OBJEXT): {$(VPATH)}intern.h
 re.$(OBJEXT): {$(VPATH)}internal.h
@@ -2156,6 +2171,7 @@ string.$(OBJEXT): $(hdrdir)/ruby/ruby.h
 string.$(OBJEXT): $(top_srcdir)/include/ruby.h
 string.$(OBJEXT): {$(VPATH)}config.h
 string.$(OBJEXT): {$(VPATH)}defines.h
+string.$(OBJEXT): {$(VPATH)}encindex.h
 string.$(OBJEXT): {$(VPATH)}encoding.h
 string.$(OBJEXT): {$(VPATH)}gc.h
 string.$(OBJEXT): {$(VPATH)}intern.h
@@ -2250,7 +2266,7 @@ thread.$(OBJEXT): {$(VPATH)}thread.h
 thread.$(OBJEXT): {$(VPATH)}thread_$(THREAD_MODEL).c
 thread.$(OBJEXT): {$(VPATH)}thread_$(THREAD_MODEL).h
 thread.$(OBJEXT): {$(VPATH)}thread_native.h
-thread.$(OBJEXT): {$(VPATH)}thread_tools.c
+thread.$(OBJEXT): {$(VPATH)}thread_sync.c
 thread.$(OBJEXT): {$(VPATH)}timev.h
 thread.$(OBJEXT): {$(VPATH)}vm_core.h
 thread.$(OBJEXT): {$(VPATH)}vm_debug.h
